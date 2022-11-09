@@ -1,0 +1,81 @@
+version : "3.6"
+
+
+services:
+
+  web :
+    build : .
+    volumes :
+      - ./src:/src/
+    container_name: "arbitrader"
+    ports :
+      - ${PORT}:${PORT}
+    env_file : .env    
+    restart : on-failure
+    networks:
+      - logging_net
+
+  redis:
+    image: redis:6.2.7
+    container_name: "redis1"
+    ports:
+      - 6379:6379
+    env_file:
+      - .env
+    networks:
+      - logging_net
+
+  flower : 
+    image : python:3.10.8
+    container_name: 'flower'
+    restart: on-failure
+    command : "sh -c app/src/containers/flower/flower.sh"
+    volumes:
+      - ./:/app
+    ports : 
+    - ${FLOWER_PORT}:${FLOWER_PORT}
+    expose :
+    - ${FLOWER_PORT}
+    depends_on :
+    - redis
+    - web
+    - celery
+    env_file:
+      - .env
+    networks:
+      - logging_net
+
+  celery :
+    image   : python:3.10.8
+    container_name: 'celery'
+    command: "sh -c app/src/containers/celery/celery.sh"
+    restart: on-failure    
+    volumes:
+      - ./:/app
+    depends_on:
+      - web
+      - redis
+    env_file:
+      - .env
+    networks:
+      - gateway
+      - logging_net
+
+  mongodb:
+    container_name: 'mongodb'
+    image: mongo:latest
+    env_file:
+      - .env
+    expose :
+    - ${MONGO_DB_PORT}
+    ports : 
+    - ${MONGO_DB_PORT}:${MONGO_DB_PORT}
+    restart:
+      on-failure
+    networks:
+      - gateway
+
+networks:
+  logging_net: {}
+  gateway: 
+    external: true
